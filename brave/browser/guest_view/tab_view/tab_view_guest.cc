@@ -204,11 +204,12 @@ void TabViewGuest::CreateWebContents(
     options.Set("partition", partition);
   }
 
-  LOG(ERROR) << "create web contents " << params;
   std::string parent_partition;
-  if (params.GetString("parent_partition", &partition)) {
-    options.Set("parent_partition", partition);
+  if (params.GetString("parent_partition", &parent_partition)) {
+    options.Set("parent_partition", parent_partition);
   }
+
+  should_nav_from_src_ = true;
 
   mate::Handle<atom::api::WebContents> new_api_web_contents =
       atom::api::WebContents::CreateGuest(isolate, options, this);
@@ -255,8 +256,10 @@ void TabViewGuest::ApplyAttributes(const base::DictionaryValue& params) {
       if (params.GetString("src", &src)) {
         src_ = GURL(src);
       }
-      if (attached()) {
+
+      if (attached() && should_nav_from_src_) {
         NavigateGuest(src_.spec(), true);
+        should_nav_from_src_ = false;
       }
     }
   }
@@ -302,6 +305,14 @@ void TabViewGuest::GuestReady() {
   // we don't use guest only processes and don't want those limitations
   CHECK(!web_contents()->GetRenderProcessHost()->IsForGuestsOnly());
 
+#if BUILDFLAG(ENABLE_EXTENSIONS)
+  api_web_contents_->Emit("guest-ready",
+      extensions::TabHelper::IdForTab(web_contents()), guest_instance_id());
+#else
+  api_web_contents_->Emit("guest-ready",
+      web_contents()->GetRenderProcessHost()->GetID(), guest_instance_id());
+#endif
+
   web_contents()
       ->GetRenderViewHost()
       ->GetWidget()
@@ -333,7 +344,8 @@ bool TabViewGuest::IsAutoSizeSupported() const {
 TabViewGuest::TabViewGuest(WebContents* owner_web_contents)
     : GuestView<TabViewGuest>(owner_web_contents),
       api_web_contents_(nullptr),
-      clone_(false) {
+      clone_(false),
+      should_nav_from_src_(false) {
 }
 
 TabViewGuest::~TabViewGuest() {
