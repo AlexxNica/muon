@@ -249,6 +249,16 @@ source_set("browser") {
     ]
   }
 
+  if (is_mac) {
+    sources += [
+      "//chrome/browser/ui/certificate_viewer_mac.h",
+      "//chrome/browser/ui/certificate_viewer_mac.mm",
+    ]
+    libs = [
+      "SecurityInterface.framework",
+    ]
+  }
+
   if (use_nss_certs) {
     sources += [
       "chrome/browser/certificate_manager_model.cc",
